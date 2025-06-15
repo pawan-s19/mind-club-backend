@@ -57,12 +57,12 @@ if (isProduction && cluster.isMaster) {
 
     // CORS and body parsing middleware
     app.use(cors());
-    app.use(express.json({ limit: '10mb' }));
-    app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+    app.use(express.json({ limit: '50mb' })); // Increased limit for base64 images
+    app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
     // Set timeout for all requests
     app.use((req, res, next) => {
-        req.setTimeout(5000, () => {
+        req.setTimeout(30000, () => { // Increased timeout to 30 seconds
             res.status(408).send('Request timeout');
         });
         next();
@@ -71,11 +71,45 @@ if (isProduction && cluster.isMaster) {
     // Routes
     app.use('/api/admin', require('./routes/admin.routes'));
     app.use('/api/workshops', require('./routes/workshop.routes'));
+    app.use('/api/upload', require('./routes/upload.routes'));
 
     // Error handling middleware
     app.use((err, req, res, next) => {
-        console.error(err.stack);
-        res.status(500).json({ message: 'Something went wrong!' });
+        console.error('Error details:', {
+            message: err.message,
+            stack: err.stack,
+            name: err.name
+        });
+
+        // Handle specific error types
+        if (err.name === 'ValidationError') {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation Error',
+                details: err.message
+            });
+        }
+
+        if (err.name === 'JsonWebTokenError') {
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid token'
+            });
+        }
+
+        if (err.name === 'TokenExpiredError') {
+            return res.status(401).json({
+                success: false,
+                error: 'Token expired'
+            });
+        }
+
+        // Default error response
+        res.status(500).json({
+            success: false,
+            error: err.message || 'Something went wrong!',
+            details: isProduction ? undefined : err.stack
+        });
     });
 
     // Start server

@@ -60,7 +60,34 @@ const processFilesInBatches = async (files, batchSize = 3) => {
     }
 };
 
-// Helper function to parse itinerary data from form fields
+// Helper function to compress base64 image
+const compressBase64Image = async (base64Image) => {
+    try {
+        // Remove data URL prefix if present
+        const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        // Process image with sharp
+        const compressedBuffer = await sharp(buffer)
+            .resize(1920, 1080, {
+                fit: 'inside',
+                withoutEnlargement: true
+            })
+            .jpeg({ 
+                quality: 80,
+                progressive: true
+            })
+            .toBuffer();
+
+        return `data:image/jpeg;base64,${compressedBuffer.toString('base64')}`;
+    } catch (error) {
+        console.error('Error compressing image:', error);
+        // If compression fails, return original base64
+        return base64Image;
+    }
+};
+
+// Helper function to parse itinerary data
 const parseItineraryData = (body) => {
     try {
         const itinerary = [];
@@ -113,25 +140,19 @@ const parseItineraryData = (body) => {
 // Create a new workshop (Admin only)
 exports.createWorkshop = async (req, res) => {
     try {
-        console.log('Files received:', req.files);
-        
-        // Parse itinerary data from form fields
-        const itinerary = parseItineraryData(req.body);
-        
         const workshopData = {
-            ...req.body,
-            itinerary
+            ...req.body
         };
 
-        // Process all files in parallel with compression
-        const processFiles = async () => {
-            const filePromises = [];
+        // Process all images in parallel
+        const processImages = async () => {
+            const imagePromises = [];
 
             // Handle banner upload
-            if (req.files && req.files.banner) {
-                filePromises.push(
-                    compressImage(req.files.banner[0])
-                        .then(compressedFile => mediaController.uploadToImageKit(compressedFile))
+            if (req.body.banner) {
+                imagePromises.push(
+                    compressBase64Image(req.body.banner)
+                        .then(compressedImage => mediaController.uploadToImageKit(compressedImage))
                         .then(upload => {
                             workshopData.media = {
                                 ...workshopData.media,
@@ -146,73 +167,79 @@ exports.createWorkshop = async (req, res) => {
             }
 
             // Handle gallery uploads
-            if (req.files && req.files.gallery) {
-                filePromises.push(
-                    processFilesInBatches(req.files.gallery)
-                        .then(compressedFiles => 
-                            Promise.all(
-                                compressedFiles.map(async (file) => {
-                                    const upload = await mediaController.uploadToImageKit(file);
-                                    return {
-                                        ...upload,
-                                        type: file.mimetype.startsWith('image/') ? 'image' : 'video',
-                                        description: req.body.galleryDescriptions?.[file.originalname] || ''
-                                    };
-                                })
-                            )
-                        )
-                        .then(uploads => {
-                            workshopData.media = {
-                                ...workshopData.media,
-                                gallery: uploads
+            if (req.body.gallery && Array.isArray(req.body.gallery)) {
+                imagePromises.push(
+                    Promise.all(
+                        req.body.gallery.map(async (imageData) => {
+                            const compressedImage = await compressBase64Image(imageData.image);
+                            const upload = await mediaController.uploadToImageKit(compressedImage);
+                            return {
+                                ...upload,
+                                type: 'image',
+                                description: imageData.description || ''
                             };
                         })
-                        .catch(error => {
-                            console.error('Error processing gallery:', error);
-                            throw error;
-                        })
+                    )
+                    .then(uploads => {
+                        workshopData.media = {
+                            ...workshopData.media,
+                            gallery: uploads
+                        };
+                    })
+                    .catch(error => {
+                        console.error('Error processing gallery:', error);
+                        throw error;
+                    })
                 );
             }
 
             // Handle itinerary activity images
-            if (req.files && req.files['itinerary.activities.image']) {
-                filePromises.push(
-                    processFilesInBatches(req.files['itinerary.activities.image'])
-                        .then(compressedFiles =>
-                            Promise.all(
-                                compressedFiles.map(file => mediaController.uploadToImageKit(file))
-                            )
-                        )
-                        .then(uploadedImages => {
-                            if (workshopData.itinerary) {
-                                workshopData.itinerary = workshopData.itinerary.map((day, dayIndex) => {
-                                    if (day.activities) {
-                                        day.activities = day.activities.map((activity, activityIndex) => {
-                                            const imageIndex = dayIndex * day.activities.length + activityIndex;
-                                            if (uploadedImages[imageIndex]) {
-                                                activity.image = uploadedImages[imageIndex];
-                                            }
-                                            return activity;
-                                        });
-                                    }
-                                    return day;
-                                });
+            if (req.body.itinerary && Array.isArray(req.body.itinerary)) {
+                imagePromises.push(
+                    Promise.all(
+                        req.body.itinerary.map(async (day) => {
+                            // Process itinerary banner
+                            if (day.itineraryBanner) {
+                                const compressedBanner = await compressBase64Image(day.itineraryBanner);
+                                const bannerUpload = await mediaController.uploadToImageKit(compressedBanner);
+                                day.itineraryBanner = {
+                                    url: bannerUpload.url,
+                                    fileId: bannerUpload.fileId
+                                };
                             }
+
+                            // Process activity images
+                            if (day.activities && Array.isArray(day.activities)) {
+                                await Promise.all(
+                                    day.activities.map(async (activity) => {
+                                        if (activity.image) {
+                                            const compressedImage = await compressBase64Image(activity.image);
+                                            const upload = await mediaController.uploadToImageKit(compressedImage);
+                                            activity.image = {
+                                                url: upload.url,
+                                                fileId: upload.fileId
+                                            };
+                                        }
+                                    })
+                                );
+                            }
+                            return day;
                         })
-                        .catch(error => {
-                            console.error('Error processing itinerary images:', error);
-                            throw error;
-                        })
+                    )
+                    .catch(error => {
+                        console.error('Error processing itinerary images:', error);
+                        throw error;
+                    })
                 );
             }
 
-            return Promise.all(filePromises);
+            return Promise.all(imagePromises);
         };
 
-        // Process all files first
-        await processFiles();
+        // Process all images first
+        await processImages();
 
-        // Create workshop after all files are processed
+        // Create workshop after all images are processed
         const workshop = new Workshop(workshopData);
         await workshop.save();
         
@@ -281,71 +308,141 @@ exports.updateWorkshop = async (req, res) => {
             });
         }
 
-        // Handle banner update
-        if (req.files && req.files.banner) {
-            // Delete old banner if exists
-            if (workshop.media?.banner?.fileId) {
-                await mediaController.deleteFromImageKit(workshop.media.banner.fileId);
+        // Helper function to delete image from ImageKit
+        const deleteImageFromImageKit = async (imageData) => {
+            if (imageData?.fileId) {
+                try {
+                    await mediaController.deleteFromImageKit(imageData.fileId);
+                    console.log('Successfully deleted image:', imageData.fileId);
+                } catch (error) {
+                    console.log('Error deleting image:', error.message);
+                }
             }
-            const bannerUpload = await mediaController.uploadToImageKit(req.files.banner[0]);
-            workshopData.media = {
-                ...workshopData.media,
-                banner: bannerUpload
-            };
-        }
+        };
 
-        // Handle gallery updates
-        if (req.files && req.files.gallery) {
-            const galleryUploads = await Promise.all(
-                req.files.gallery.map(async (file) => {
-                    const upload = await mediaController.uploadToImageKit(file);
-                    return {
-                        ...upload,
-                        type: file.mimetype.startsWith('image/') ? 'image' : 'video',
-                        description: req.body.galleryDescriptions?.[file.originalname] || ''
-                    };
-                })
-            );
-            workshopData.media = {
-                ...workshopData.media,
-                gallery: [...(workshop.media?.gallery || []), ...galleryUploads]
-            };
-        }
+        // Process all images in parallel
+        const processImages = async () => {
+            const imagePromises = [];
 
-        // Handle itinerary activity images update
-        if (req.files && req.files['itinerary.activities.image']) {
-            const activityImages = req.files['itinerary.activities.image'];
-            const uploadedImages = await Promise.all(
-                activityImages.map(async (file) => {
-                    const upload = await mediaController.uploadToImageKit(file);
-                    return {
-                        url: upload.url,
-                        fileId: upload.fileId
-                    };
-                })
-            );
+            // Handle banner update
+            if (req.body.banner) {
+                // Delete old banner if exists
+                if (workshop.media?.banner?.fileId) {
+                    await deleteImageFromImageKit(workshop.media.banner);
+                }
+                imagePromises.push(
+                    compressBase64Image(req.body.banner)
+                        .then(compressedImage => mediaController.uploadToImageKit(compressedImage))
+                        .then(upload => {
+                            workshopData.media = {
+                                ...workshopData.media,
+                                banner: upload
+                            };
+                        })
+                );
+            }
 
-            // Update itinerary with uploaded images
-            if (workshopData.itinerary) {
-                workshopData.itinerary = workshopData.itinerary.map((day, dayIndex) => {
-                    if (day.activities) {
-                        day.activities = day.activities.map((activity, activityIndex) => {
-                            const imageIndex = dayIndex * day.activities.length + activityIndex;
-                            if (uploadedImages[imageIndex]) {
-                                // Delete old image if exists
+            // Handle gallery updates
+            if (req.body.gallery && Array.isArray(req.body.gallery)) {
+                // Delete old gallery images
+                if (workshop.media?.gallery) {
+                    await Promise.all(
+                        workshop.media.gallery.map(file => deleteImageFromImageKit(file))
+                    );
+                }
+
+                imagePromises.push(
+                    Promise.all(
+                        req.body.gallery.map(async (imageData) => {
+                            const compressedImage = await compressBase64Image(imageData.image);
+                            const upload = await mediaController.uploadToImageKit(compressedImage);
+                            return {
+                                ...upload,
+                                type: 'image',
+                                description: imageData.description || ''
+                            };
+                        })
+                    )
+                    .then(uploads => {
+                        workshopData.media = {
+                            ...workshopData.media,
+                            gallery: uploads
+                        };
+                    })
+                );
+            }
+
+            // Handle itinerary updates
+            if (req.body.itinerary && Array.isArray(req.body.itinerary)) {
+                // Delete old itinerary images
+                if (workshop.itinerary) {
+                    for (const day of workshop.itinerary) {
+                        // Delete itinerary banner
+                        if (day.itineraryBanner?.fileId) {
+                            await deleteImageFromImageKit(day.itineraryBanner);
+                        }
+
+                        // Delete activity images
+                        if (day.activities) {
+                            for (const activity of day.activities) {
                                 if (activity.image?.fileId) {
-                                    mediaController.deleteFromImageKit(activity.image.fileId);
+                                    await deleteImageFromImageKit(activity.image);
                                 }
-                                activity.image = uploadedImages[imageIndex];
                             }
-                            return activity;
-                        });
+                        }
                     }
-                    return day;
-                });
-            }
-        }
+                }
 
+                // Process new itinerary images
+                imagePromises.push(
+                    Promise.all(
+                        req.body.itinerary.map(async (day) => {
+                            const processedDay = { ...day };
+
+                            // Process itinerary banner
+                            if (day.itineraryBanner) {
+                                const compressedBanner = await compressBase64Image(day.itineraryBanner);
+                                const bannerUpload = await mediaController.uploadToImageKit(compressedBanner);
+                                processedDay.itineraryBanner = {
+                                    url: bannerUpload.url,
+                                    fileId: bannerUpload.fileId
+                                };
+                            }
+
+                            // Process activity images
+                            if (day.activities && Array.isArray(day.activities)) {
+                                processedDay.activities = await Promise.all(
+                                    day.activities.map(async (activity) => {
+                                        const processedActivity = { ...activity };
+                                        if (activity.image) {
+                                            const compressedImage = await compressBase64Image(activity.image);
+                                            const upload = await mediaController.uploadToImageKit(compressedImage);
+                                            processedActivity.image = {
+                                                url: upload.url,
+                                                fileId: upload.fileId
+                                            };
+                                        }
+                                        return processedActivity;
+                                    })
+                                );
+                            }
+
+                            return processedDay;
+                        })
+                    )
+                    .then(processedItinerary => {
+                        workshopData.itinerary = processedItinerary;
+                    })
+                );
+            }
+
+            return Promise.all(imagePromises);
+        };
+
+        // Process all images first
+        await processImages();
+
+        // Update workshop after all images are processed
         const updatedWorkshop = await Workshop.findByIdAndUpdate(
             req.params.id,
             workshopData,
@@ -360,9 +457,10 @@ exports.updateWorkshop = async (req, res) => {
             data: updatedWorkshop
         });
     } catch (error) {
+        console.error('Workshop update error:', error);
         res.status(400).json({
             success: false,
-            error: error.message
+            error: error.message || 'Invalid input'
         });
     }
 };
@@ -379,6 +477,8 @@ exports.deleteWorkshop = async (req, res) => {
             });
         }
 
+        console.log('Starting workshop deletion process for:', workshop._id);
+
         // Delete all media files from ImageKit
         try {
             if (workshop.media) {
@@ -386,6 +486,7 @@ exports.deleteWorkshop = async (req, res) => {
                 if (workshop.media.banner?.fileId) {
                     try {
                         await mediaController.deleteFromImageKit(workshop.media.banner.fileId);
+                        console.log('Successfully deleted banner:', workshop.media.banner.fileId);
                     } catch (error) {
                         console.log('Error deleting banner:', error.message);
                     }
@@ -398,6 +499,7 @@ exports.deleteWorkshop = async (req, res) => {
                             if (file.fileId) {
                                 try {
                                     await mediaController.deleteFromImageKit(file.fileId);
+                                    console.log('Successfully deleted gallery file:', file.fileId);
                                 } catch (error) {
                                     console.log('Error deleting gallery file:', error.message);
                                 }
@@ -407,21 +509,43 @@ exports.deleteWorkshop = async (req, res) => {
                 }
             }
 
-            // Delete itinerary activity images
-            if (workshop.itinerary) {
-                await Promise.all(
-                    workshop.itinerary.flatMap(day => 
-                        day.activities.map(async activity => {
+            // Delete itinerary banner and activity images
+            if (workshop.itinerary && Array.isArray(workshop.itinerary)) {
+                console.log('Processing itinerary deletion...');
+                
+                for (const day of workshop.itinerary) {
+                    console.log('Processing day:', day.day);
+                    
+                    // Delete itinerary banner
+                    if (day.itineraryBanner?.fileId) {
+                        try {
+                            console.log('Found itinerary banner fileId:', day.itineraryBanner.fileId);
+                            await mediaController.deleteFromImageKit(day.itineraryBanner.fileId);
+                            console.log('Successfully deleted itinerary banner:', day.itineraryBanner.fileId);
+                        } catch (error) {
+                            console.log('Error deleting itinerary banner:', error.message);
+                        }
+                    }
+
+                    // Delete activity images
+                    if (day.activities && Array.isArray(day.activities)) {
+                        console.log('Processing activities for day:', day.day);
+                        
+                        for (const activity of day.activities) {
                             if (activity.image?.fileId) {
                                 try {
+                                    console.log('Found activity image fileId:', activity.image.fileId);
                                     await mediaController.deleteFromImageKit(activity.image.fileId);
+                                    console.log('Successfully deleted activity image:', activity.image.fileId);
                                 } catch (error) {
                                     console.log('Error deleting activity image:', error.message);
                                 }
                             }
-                        })
-                    )
-                );
+                        }
+                    }
+                }
+            } else {
+                console.log('No itinerary found or itinerary is not an array');
             }
         } catch (mediaError) {
             console.log('Error during media cleanup:', mediaError.message);
@@ -430,6 +554,7 @@ exports.deleteWorkshop = async (req, res) => {
 
         // Delete the workshop document
         await Workshop.findByIdAndDelete(req.params.id);
+        console.log('Workshop document deleted successfully');
         
         res.status(200).json({
             success: true,
@@ -437,6 +562,7 @@ exports.deleteWorkshop = async (req, res) => {
             message: 'Workshop deleted successfully'
         });
     } catch (error) {
+        console.log('Error in deleteWorkshop:', error.message);
         res.status(500).json({
             success: false,
             error: error.message

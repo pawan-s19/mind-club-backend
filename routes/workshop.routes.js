@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const workshopController = require('../controllers/workshop.controller');
 const { protect, authorize } = require('../middleware/auth.middleware');
-const { upload, handleMulterError } = require('../config/multer.config');
 
 // Public routes
 router.get('/', workshopController.getAllWorkshops);
@@ -12,16 +11,12 @@ router.get('/:id', workshopController.getWorkshop);
 router.post('/',
     protect,
     authorize('admin'),
-    upload,
-    handleMulterError,
     workshopController.createWorkshop
 );
 
 router.put('/:id',
     protect,
     authorize('admin'),
-    upload,
-    handleMulterError,
     workshopController.updateWorkshop
 );
 

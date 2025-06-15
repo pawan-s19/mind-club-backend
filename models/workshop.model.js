@@ -28,8 +28,19 @@ const workshopSchema = new mongoose.Schema({
         required: true
     },
     itinerary: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Itinerary'
+        day: Number,
+        itineraryBanner: {
+            url: String,
+            fileId: String
+        },
+        activities: [{
+            time: String,
+            activity: String,
+            image: {
+                url: String,
+                fileId: String
+            }
+        }]
     }],
     mainHeading: {
         type: String,

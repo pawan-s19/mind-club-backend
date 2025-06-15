@@ -1,11 +1,36 @@
 const imagekit = require('../config/imagekit.config');
+const fs = require('fs');
+const path = require('path');
 
 // Upload file to ImageKit
 exports.uploadToImageKit = async (file, folder = 'workshops') => {
     try {
+        let fileData;
+        let fileName;
+
+        // Handle base64 data
+        if (typeof file === 'string' && file.startsWith('data:')) {
+            // Extract the base64 data
+            const matches = file.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
+            if (!matches || matches.length !== 3) {
+                throw new Error('Invalid base64 data');
+            }
+            fileData = Buffer.from(matches[2], 'base64');
+            fileName = `image_${Date.now()}.${matches[1].split('/')[1]}`;
+        } 
+        // Handle file path
+        else if (file.path) {
+            fileData = fs.readFileSync(file.path);
+            fileName = file.filename;
+            // Delete the temporary file
+            fs.unlinkSync(file.path);
+        } else {
+            throw new Error('Invalid file data');
+        }
+
         const uploadResponse = await imagekit.upload({
-            file: file.buffer,
-            fileName: file.originalname,
+            file: fileData,
+            fileName: fileName,
             folder: folder
         });
 
@@ -14,6 +39,10 @@ exports.uploadToImageKit = async (file, folder = 'workshops') => {
             fileId: uploadResponse.fileId
         };
     } catch (error) {
+        // Delete the temporary file if it exists
+        if (file.path && fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+        }
         throw error;
     }
 };
