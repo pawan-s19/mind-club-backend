@@ -10,13 +10,17 @@ exports.uploadToImageKit = async (file, folder = 'workshops') => {
 
         // Handle base64 data
         if (typeof file === 'string' && file.startsWith('data:')) {
-            // Extract the base64 data
-            const matches = file.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
+            // Log the start of the file string to help debug
+            console.log('Attempting to process Data URI:', file.substring(0, 100));
+
+            // Extract the base64 data. Made the regex safer for different MIME types.
+            const matches = file.match(/^data:([A-Za-z0-9/.-]+);base64,(.+)$/);
             if (!matches || matches.length !== 3) {
+                console.error('Regex match failed. The Data URI format is invalid.');
                 throw new Error('Invalid base64 data');
             }
             fileData = Buffer.from(matches[2], 'base64');
-            fileName = `image_${Date.now()}.${matches[1].split('/')[1]}`;
+            fileName = `media_${Date.now()}.${matches[1].split('/')[1]}`;
         } 
         // Handle file path
         else if (file.path) {

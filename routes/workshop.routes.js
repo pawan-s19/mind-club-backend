@@ -23,10 +23,11 @@ router.put('/:id',
 router.delete('/:id', protect, authorize('admin'), workshopController.deleteWorkshop);
 
 // Media management routes
-router.delete('/:workshopId/media/:type/:fileId',
-    protect,
-    authorize('admin'),
-    workshopController.deleteWorkshopMedia
-);
+// TODO: Implement deleteWorkshopMedia in workshop.controller.js
+// router.delete('/:workshopId/media/:type/:fileId',
+//     protect,
+//     authorize('admin'),
+//     workshopController.deleteWorkshopMedia
+// );
 
 module.exports = router; 
