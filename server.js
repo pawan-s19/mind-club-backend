@@ -57,7 +57,9 @@ if (isProduction && cluster.isMaster) {
 
     // CORS and body parsing middleware
     app.use(cors({
-        origin: '*',
+        origin: (origin, callback) => {
+            callback(null, origin); // Reflects the request origin
+        },
         credentials: true
     }));
     app.use(express.json({ limit: '50mb' })); // Increased limit for base64 images
