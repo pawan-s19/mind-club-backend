@@ -62,6 +62,16 @@ if (isProduction && cluster.isMaster) {
     app.use(express.json({ limit: '50mb' })); // Increased limit for base64 images
     app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+    // Timing middleware: logs how long each request takes
+    app.use((req, res, next) => {
+      const start = Date.now();
+      res.on('finish', () => {
+        const duration = Date.now() - start;
+        console.log(`${req.method} ${req.originalUrl} took ${duration}ms`);
+      });
+      next();
+    });
+
     // Set timeout for all requests
     app.use((req, res, next) => {
         req.setTimeout(30000, () => { // Increased timeout to 30 seconds
