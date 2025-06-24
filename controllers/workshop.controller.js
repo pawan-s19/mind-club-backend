@@ -219,6 +219,14 @@ const processWorkshopImages = async (data) => {
             })
         );
     }
+    if (processedData.creators?.imageOrVideo) {
+        processedData.creators.imageOrVideo = await Promise.all(
+            processedData.creators.imageOrVideo.map(async (media) => await processField(media))
+        );
+    }
+    if (processedData.mentor?.mentorImage) {
+        processedData.mentor.mentorImage = await processField(processedData.mentor.mentorImage);
+    }
 
     // This field doesn't contain uploads, so we ensure it's not processed
     if (data.previousWorkshopGlimpses) {
