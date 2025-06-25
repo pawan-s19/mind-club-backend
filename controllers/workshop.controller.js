@@ -287,13 +287,12 @@ exports.createWorkshop = async (req, res) => {
         await workshop.save();
 
         // Fetch all workshops to return in the response
-        const allWorkshops = await Workshop.find({}).sort({ createdAt: -1 }).lean();
+        // const allWorkshops = await Workshop.find({}).sort({ createdAt: -1 }).lean();
 
         res.status(201).json({
             success: true,
             message: 'Workshop created successfully.',
-            count: allWorkshops.length,
-            data: allWorkshops
+            data: workshop
         });
     } catch (error) {
         console.error('Workshop creation error:', error);
@@ -362,6 +361,7 @@ exports.updateWorkshop = async (req, res) => {
         // --- Collect File IDs of all old images for potential deletion ---
         const oldFileIds = [];
         const collectFileIds = (obj) => {
+            
             if (obj && obj.fileId) oldFileIds.push(obj.fileId);
             if (obj && typeof obj === 'object') {
                 Object.values(obj).forEach(collectFileIds);
@@ -401,13 +401,12 @@ exports.updateWorkshop = async (req, res) => {
         }
 
         // Fetch all workshops to return in the response
-        const allWorkshops = await Workshop.find({}).sort({ createdAt: -1 }).lean();
+        // const allWorkshops = await Workshop.find({}).sort({ createdAt: -1 }).lean();
 
         res.status(200).json({
             success: true,
             message: 'Workshop updated successfully.',
-            count: allWorkshops.length,
-            data: allWorkshops
+            data: updatedWorkshop
         });
     } catch (error) {
         console.error('Workshop update error:', error);
