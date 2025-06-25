@@ -144,96 +144,138 @@ const compressBase64Image = async (base64Image) => {
 
 // Helper function to upload any base64 media, compressing only if it's an image
 const uploadBase64Media = async (base64String) => {
-    // Ensure we have a valid base64 string
-    if (typeof base64String !== 'string' || !base64String.startsWith('data:')) {
-        return base64String;
-    }
+    try {
+        // Ensure we have a valid base64 string
+        if (typeof base64String !== 'string' || !base64String.startsWith('data:')) {
+            console.log('Skipping upload - not a base64 string:', typeof base64String);
+            return base64String;
+        }
 
-    let mediaToUpload = base64String;
+        console.log('Processing base64 media for upload...');
+        let mediaToUpload = base64String;
 
-    // Only compress if it's a new base64 image string
-    if (base64String.startsWith('data:image')) {
-        mediaToUpload = await compressBase64Image(base64String);
+        // Only compress if it's a new base64 image string
+        if (base64String.startsWith('data:image')) {
+            console.log('Compressing image before upload...');
+            mediaToUpload = await compressBase64Image(base64String);
+            console.log('Image compression completed');
+        } else {
+            console.log('Non-image media detected, skipping compression');
+        }
+        
+        console.log('Uploading to ImageKit...');
+        // Pass the full data URI, as the media controller is designed to handle it.
+        const result = await mediaController.uploadToImageKit(mediaToUpload);
+        console.log('Upload successful:', result.url);
+        return result;
+    } catch (error) {
+        console.error('Error in uploadBase64Media:', error.message);
+        throw error;
     }
-    
-    // Pass the full data URI, as the media controller is designed to handle it.
-    return await mediaController.uploadToImageKit(mediaToUpload);
 };
 
 // Recursive helper to process all image uploads within the workshop data
 const processWorkshopImages = async (data) => {
+    console.log('Starting workshop image processing...');
     const processedData = JSON.parse(JSON.stringify(data)); // Deep copy
 
     // A nested helper to check and upload if the field is a base64 string
     const processField = async (fieldValue) => {
         if (typeof fieldValue === 'string' && fieldValue.startsWith('data:')) {
-            return await uploadBase64Media(fieldValue);
+            console.log('Found base64 field, processing upload...');
+            try {
+                const result = await uploadBase64Media(fieldValue);
+                console.log('Field processed successfully');
+                return result;
+            } catch (error) {
+                console.error('Failed to process field:', error.message);
+                throw error;
+            }
         }
         return fieldValue; // Return as-is if not a new base64 upload
     };
 
-    if (processedData.header) {
-        if (processedData.header.image) {
-            processedData.header.image = await processField(processedData.header.image);
+    try {
+        if (processedData.header) {
+            console.log('Processing header images...');
+            if (processedData.header.image) {
+                processedData.header.image = await processField(processedData.header.image);
+            }
+            if (processedData.header.watchTrailer) {
+                processedData.header.watchTrailer = await processField(processedData.header.watchTrailer);
+            }
         }
-        if (processedData.header.watchTrailer) {
-            processedData.header.watchTrailer = await processField(processedData.header.watchTrailer);
+        
+        if (processedData.brochure) {
+            console.log('Processing brochure...');
+            processedData.brochure = await processField(processedData.brochure);
         }
-    }
-    if (processedData.brochure) {
-        processedData.brochure = await processField(processedData.brochure);
-    }
-    if (processedData.about?.workshopVisual) {
-        processedData.about.workshopVisual = await Promise.all(
-            processedData.about.workshopVisual.map(async (item) => ({
-                ...item,
-                imageOrVideo: await processField(item.imageOrVideo),
-            }))
-        );
-    }
-    if (processedData.location?.locationBlog) {
-        processedData.location.locationBlog = await Promise.all(
-            processedData.location.locationBlog.map(async (item) => ({
-                ...item,
-                imageOrVideo: await processField(item.imageOrVideo),
-            }))
-        );
-    }
-    if (processedData.itinerary) {
-        processedData.itinerary = await Promise.all(
-            processedData.itinerary.map(async (day) => {
-                if (day.itineraryBanner) {
-                    day.itineraryBanner = await processField(day.itineraryBanner);
-                }
-                if (day.activities) {
-                    day.activities = await Promise.all(
-                        day.activities.map(async (activity) => {
-                            if (activity.image?.imageOrVideo) {
-                                activity.image.imageOrVideo = await processField(activity.image.imageOrVideo);
-                            }
-                            return activity;
-                        })
-                    );
-                }
-                return day;
-            })
-        );
-    }
-    if (processedData.creators?.imageOrVideo) {
-        processedData.creators.imageOrVideo = await Promise.all(
-            processedData.creators.imageOrVideo.map(async (media) => await processField(media))
-        );
-    }
-    if (processedData.mentor?.mentorImage) {
-        processedData.mentor.mentorImage = await processField(processedData.mentor.mentorImage);
-    }
+        
+        if (processedData.about?.workshopVisual) {
+            console.log('Processing workshop visual images...');
+            processedData.about.workshopVisual = await Promise.all(
+                processedData.about.workshopVisual.map(async (item) => ({
+                    ...item,
+                    imageOrVideo: await processField(item.imageOrVideo),
+                }))
+            );
+        }
+        
+        if (processedData.location?.locationBlog) {
+            console.log('Processing location blog images...');
+            processedData.location.locationBlog = await Promise.all(
+                processedData.location.locationBlog.map(async (item) => ({
+                    ...item,
+                    imageOrVideo: await processField(item.imageOrVideo),
+                }))
+            );
+        }
+        
+        if (processedData.itinerary) {
+            console.log('Processing itinerary images...');
+            processedData.itinerary = await Promise.all(
+                processedData.itinerary.map(async (day) => {
+                    if (day.itineraryBanner) {
+                        day.itineraryBanner = await processField(day.itineraryBanner);
+                    }
+                    if (day.activities) {
+                        day.activities = await Promise.all(
+                            day.activities.map(async (activity) => {
+                                if (activity.image?.imageOrVideo) {
+                                    activity.image.imageOrVideo = await processField(activity.image.imageOrVideo);
+                                }
+                                return activity;
+                            })
+                        );
+                    }
+                    return day;
+                })
+            );
+        }
+        
+        if (processedData.creators?.imageOrVideo) {
+            console.log('Processing creators media...');
+            processedData.creators.imageOrVideo = await Promise.all(
+                processedData.creators.imageOrVideo.map(async (media) => await processField(media))
+            );
+        }
+        
+        if (processedData.mentor?.mentorImage) {
+            console.log('Processing mentor image...');
+            processedData.mentor.mentorImage = await processField(processedData.mentor.mentorImage);
+        }
 
-    // This field doesn't contain uploads, so we ensure it's not processed
-    if (data.previousWorkshopGlimpses) {
-        processedData.previousWorkshopGlimpses = data.previousWorkshopGlimpses;
-    }
+        // This field doesn't contain uploads, so we ensure it's not processed
+        if (data.previousWorkshopGlimpses) {
+            processedData.previousWorkshopGlimpses = data.previousWorkshopGlimpses;
+        }
 
-    return processedData;
+        console.log('Workshop image processing completed successfully');
+        return processedData;
+    } catch (error) {
+        console.error('Error in processWorkshopImages:', error.message);
+        throw error;
+    }
 };
 
 exports.createWorkshop = async (req, res) => {

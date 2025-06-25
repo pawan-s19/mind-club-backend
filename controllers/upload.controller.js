@@ -1,11 +1,4 @@
-const ImageKit = require('imagekit');
-
-// Initialize ImageKit
-const imagekit = new ImageKit({
-    publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
-    privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
-    urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
-});
+const mediaController = require('./media.controller');
 
 // Controller for uploading images
 const uploadImage = async (req, res) => {
@@ -16,12 +9,10 @@ const uploadImage = async (req, res) => {
             return res.status(400).json({ message: 'No image data provided' });
         }
 
-        // Upload to ImageKit
-        const result = await imagekit.upload({
-            file: image, // base64 image data
-            fileName: `image_${Date.now()}.jpg`, // Generate unique filename
-            folder: '/mind-club' // Optional: specify folder in ImageKit
-        });
+        console.log('Uploading image via media controller...');
+
+        // Upload to ImageKit using the centralized media controller
+        const result = await mediaController.uploadToImageKit(image, 'mind-club');
 
         res.status(200).json({
             success: true,
