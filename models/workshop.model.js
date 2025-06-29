@@ -32,6 +32,15 @@ const workshopSchema = new mongoose.Schema({
         enum: ['online', 'on field'],
         required: true
     },
+    category: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    thumbnail: {
+        url: String,
+        fileId: { type: String, select: false }
+    },
     about: {
         title: {
             type: String,
@@ -71,43 +80,30 @@ const workshopSchema = new mongoose.Schema({
         type: Date,
         required: true
     },
-    itinerary: [{
+    itinerary: {
+        title: String,
+        description: String,
+        itineraryDays: [{
         day: Number,
-        itineraryBanner: {
-            url: String,
-            fileId: { type: String, select: false }
-        },
         title: {
             type: String,
             required: true
         },
-        description: {
-            type: String,
-            required: true
-        },
         activities: [{
-            time: String,
-            activity: String,
-            image: {
                 imageOrVideo: {
                     url: String,
                     fileId: { type: String, select: false }
                 },
                 description: String
-            },
-            color: {
-                type: String,
-                required: true
-            }
         }]
-    }],
+        }]},
 
     subHeroHeading : {
         type : String,
         required : true
     },
     skills:{
-        headingOfSection : String,
+
         skills : [{
             type: String,
             required : true
@@ -172,6 +168,8 @@ function structureWorkshopData(data) {
         },
         brochure: data.brochure || {},
         workshopType: data.workshopType,
+        category: data.category,
+        thumbnail: data.thumbnail || {},
         about: {
             title: data.about?.title || '',
             description: data.about?.description || '',
@@ -184,10 +182,13 @@ function structureWorkshopData(data) {
         },
         startDate: data.startDate,
         endDate: data.endDate,
-        itinerary: Array.isArray(data.itinerary) ? data.itinerary : [],
+        itinerary: {
+            title: data.itinerary?.title || '',
+            description: data.itinerary?.description || '',
+            itineraryDays: Array.isArray(data.itinerary?.itineraryDays) ? data.itinerary.itineraryDays : [],
+        },
         subHeroHeading: data.subHeroHeading,
         skills: {
-            name: data.skills?.name || '',
             skills: Array.isArray(data.skills?.skills) ? data.skills.skills : [],
         },
         creators: {
@@ -202,12 +203,5 @@ function structureWorkshopData(data) {
             about: data.mentor?.about || '',
             mentorImage: data.mentor?.mentorImage || {},
         },
-        elegablePersonSkills: Array.isArray(data.elegablePersonSkills) ? data.elegablePersonSkills : [],
-        mainHeading: data.mainHeading,
-        inclusions: Array.isArray(data.inclusions) ? data.inclusions : [],
-        exclusions: Array.isArray(data.exclusions) ? data.exclusions : [],
-        priceBreakdown: data.priceBreakdown,
-        referenceMember: data.referenceMember,
-        previousWorkshopGlimpses: Array.isArray(data.previousWorkshopGlimpses) ? data.previousWorkshopGlimpses : [],
     };
 } 
