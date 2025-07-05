@@ -42,10 +42,6 @@ const onlineWorkshopSchema = new mongoose.Schema({
       default: 'INR',
       trim: true,
     },
-    purchaseLink: {
-      type: String,
-      trim: true,
-    },
   },
 
   // 🔹 SECTION 3: Workshop Highlights
@@ -60,10 +56,6 @@ const onlineWorkshopSchema = new mongoose.Schema({
       type: Boolean,
       default: true,
     },
-    certificateDetails: {
-      type: String,
-      trim: true,
-    },
     duration: {
       type: String,
       required: true,
@@ -77,69 +69,113 @@ const onlineWorkshopSchema = new mongoose.Schema({
   },
 
   // 🔹 SECTION 4: About Workshop
-  description: {
-    type: String,
-    required: true,
-    trim: true,
+  aboutWorkshop: {
+    title: {
+      type: String,
+      trim: true,
+    },
+    description: {
+      type: String,
+      required: true,
+      trim: true,
+    },
   },
 
   // 🔹 SECTION 5: Mentor's Work (Projects)
-  projects: [
-    {
-      title: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-      subtitle: {
-        type: String,
-        trim: true,
-      },
-      image: {
-        url: { type: String, trim: true },
-        fileId: { type: String, select: false },
-      },
-      link: {
-        type: String,
-        trim: true,
-      },
+  projects: {
+    title: {
+      type: String,
+      trim: true,
     },
-  ],
+    description: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    items: [
+      {
+        title: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        subtitle: {
+          type: String,
+          trim: true,
+        },
+        image: {
+          url: { type: String, trim: true },
+          fileId: { type: String, select: false },
+        },
+        link: {
+          type: String,
+          trim: true,
+        },
+      }
+    ]
+  },
 
   // 🔹 SECTION 6: What You'll Learn (Topics)
-  learnings: {
-    type: [String],
-    default: [],
+  topics: {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    subtitle: {
+      type: String,
+      trim: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    learnings: {
+      type: [String],
+      default: [],
+    },
   },
 
   // 🔹 SECTION 7: Mentor Information
-  mentors: [
-    {
-      name: {
-        type: String,
-        trim: true,
-      },
-      description: {
-        type: String,
-        trim: true,
-      },
-      about: {
-        type: String,
-        trim: true,
-      },
-      photo: {
-        url: { type: String, trim: true },
-        fileId: { type: String, select: false },
-      },
-      links: {
-        instagram: { type: String, trim: true },
-        youtube: { type: String, trim: true },
-        linkedin: { type: String, trim: true },
-      },
+  aboutMentors: {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
     },
-  ],
+    subtitle: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    mentors: [
+      {
+        name: {
+          type: String,
+          trim: true,
+        },
+        description: {
+          type: String,
+          trim: true,
+        },
+        about: {
+          type: String,
+          trim: true,
+        },
+        photo: {
+          url: { type: String, trim: true },
+          fileId: { type: String, select: false },
+        },
+        socialLinks: [
+          {
+            platform: { type: String },
+            url: { type: String }
+          }
+        ]
+      }
+    ]
+  },
 
-  // 🔹 SECTION 8: Meeting Link (Zoom/Meet)
   meetingLink: {
     type: String,
     trim: true,
