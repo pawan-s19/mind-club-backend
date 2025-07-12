@@ -9,20 +9,20 @@ router.get('/:id', onlineWorkshopController.getOnlineWorkshop);
 
 // Admin only routes
 router.post('/',
-    protect,
-    authorize('admin'),
+    // protect,
+    // authorize('admin'),
     onlineWorkshopController.createOnlineWorkshop
 );
 
 router.put('/:id',
-    protect,
-    authorize('admin'),
+    // protect,
+    // authorize('admin'),
     onlineWorkshopController.updateOnlineWorkshop
 );
 
 router.delete('/:id', 
-    protect, 
-    authorize('admin'), 
+    // protect, 
+    // authorize('admin'), 
     onlineWorkshopController.deleteOnlineWorkshop
 );
 

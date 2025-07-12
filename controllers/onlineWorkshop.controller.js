@@ -216,6 +216,20 @@ exports.getOnlineWorkshop = async (req, res) => {
     if (!workshop) {
       return res.status(404).json({ success: false, message: 'Workshop not found' });
     }
+
+    let isEnrolled = false;
+    if (req.user && req.user.id) {
+      const Enrollment = require('../models/Enrollment.model');
+      isEnrolled = await Enrollment.exists({
+        user: req.user.id,
+        workshop: req.params.id
+      });
+    }
+
+    if (!isEnrolled) {
+      workshop.meetingLink = undefined; // Hide meeting link if not enrolled
+    }
+
     res.status(200).json({ success: true, data: workshop });
   } catch (error) {
     console.error('Fetch Error:', error);
@@ -252,3 +266,5 @@ exports.deleteOnlineWorkshop = async (req, res) => {
     res.status(500).json({ success: false, message: 'Deletion failed', error: error.message });
   }
 };
+
+

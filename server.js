@@ -7,6 +7,8 @@ const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
+const Razorpay = require('razorpay');
+const crypto = require('crypto');
 
 // Load environment variables
 dotenv.config();
@@ -66,18 +68,18 @@ if (isProduction && cluster.isMaster) {
         allowedHeaders: ['Content-Type', 'Authorization'], // Specify allowed headers
         credentials: true // Include cookies in cross-origin requests
     }));
-    
+
     app.use(express.json({ limit: '50mb' })); // Increased limit for base64 images
     app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
     // Timing middleware: logs how long each request takes
     app.use((req, res, next) => {
-      const start = Date.now();
-      res.on('finish', () => {
-        const duration = Date.now() - start;
-        console.log(`${req.method} ${req.originalUrl} took ${duration}ms`);
-      });
-      next();
+        const start = Date.now();
+        res.on('finish', () => {
+            const duration = Date.now() - start;
+            console.log(`${req.method} ${req.originalUrl} took ${duration}ms`);
+        });
+        next();
     });
 
     // Set timeout for all requests
@@ -94,7 +96,13 @@ if (isProduction && cluster.isMaster) {
     app.use('/api/landing', require('./routes/landing.route'));
     app.use('/api/upload', require('./routes/upload.routes'));
     app.use('/api/online-workshops', require('./routes/onlineWorkshop.routes'));
-    
+    app.use('/api/users', require('./routes/user.routes'));
+    app.use('/api/enrollment', require('./routes/enrollment.routes'));
+
+
+    app.post("/payment/orders", require('./controllers/enrollment.controller').order);
+
+    app.post("/payment/success", require('./controllers/enrollment.controller').success);
 
     // Error handling middleware
     app.use((err, req, res, next) => {
