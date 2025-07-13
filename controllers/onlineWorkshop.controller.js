@@ -145,17 +145,6 @@ exports.updateOnlineWorkshop = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Workshop not found' });
     }
 
-    if (
-      !rawData.workshopHeader?.title ||
-      !rawData.workshopHeader?.startDate ||
-      !rawData.workshopHeader?.endDate ||
-      !rawData.workshopHighlights?.duration ||
-      !rawData.price?.amount ||
-      !rawData.meetingLink
-    ) {
-      return res.status(400).json({ success: false, message: 'Missing required fields' });
-    }
-
     // Collect old fileIds
     const oldFileIds = [];
     const collectFileIds = (obj) => {
@@ -185,7 +174,7 @@ exports.updateOnlineWorkshop = async (req, res) => {
       fileIdsToDelete.map((id) =>
         mediaController.deleteFromImageKit(id).catch((err) =>
           console.warn(`Failed to delete fileId ${id}:`, err.message)
-        )
+        ) 
       )
     );
 
