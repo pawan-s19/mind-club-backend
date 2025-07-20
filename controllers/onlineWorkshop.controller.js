@@ -246,6 +246,20 @@ exports.getAllOnlineWorkshops = async (req, res) => {
 exports.getOnlineWorkshop = async (req, res) => {
   try {
     const workshop = await OnlineWorkshop.findById(req.params.id).lean();
+    let token, user;
+
+    if (
+      req.headers.authorization &&
+      req.headers.authorization.startsWith("Bearer")
+    ) {
+      token = req.headers.authorization.split(" ")[1];
+    }
+
+    if (token) {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      user = await User.findById(decoded.id).select("-password");
+    }
+
     if (!workshop) {
       return res
         .status(404)
@@ -253,10 +267,10 @@ exports.getOnlineWorkshop = async (req, res) => {
     }
 
     let isEnrolled = false;
-    if (req.user && req.user.id) {
+    if (user._id) {
       const Enrollment = require("../models/Enrollment.model");
       isEnrolled = await Enrollment.exists({
-        user: req.user.id,
+        user: user._id,
         workshop: req.params.id,
       });
     }
