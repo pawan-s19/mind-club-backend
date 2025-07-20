@@ -3,6 +3,7 @@ const mediaController = require("./media.controller");
 const sharp = require("sharp");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user.model");
+const Enrollment = require("../models/Enrollment.model");
 
 const compressBase64Image = async (base64Image) => {
   try {
@@ -334,5 +335,22 @@ exports.deleteOnlineWorkshop = async (req, res) => {
       message: "Deletion failed",
       error: error.message,
     });
+  }
+};
+
+exports.getEnrolledOnlineWorkshops = async (req, res) => {
+  try {
+    const alreadyEnrolled = await Enrollment.find({
+      user: req.user._id,
+    })
+      .populate("workshop")
+      .select("-user -paymentInfo");
+
+    return res.status(200).json({
+      success: true,
+      workshops: alreadyEnrolled,
+    });
+  } catch (err) {
+    return res.send(err);
   }
 };
