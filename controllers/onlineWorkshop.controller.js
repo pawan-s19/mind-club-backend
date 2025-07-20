@@ -274,11 +274,11 @@ exports.getOnlineWorkshop = async (req, res) => {
     }
 
     let isEnrolled = false;
-    if (user._id) {
+    if (user?._id) {
       const Enrollment = require("../models/Enrollment.model");
       isEnrolled = await Enrollment.exists({
         user: user._id,
-        workshop: req.params.id,
+        workshop: req.params?.id,
       });
     }
 
