@@ -254,7 +254,12 @@ exports.getOnlineWorkshop = async (req, res) => {
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer")
     ) {
-      token = req.headers.authorization.split(" ")[1];
+      const tokenValue = req.headers.authorization.split(" ")[1];
+      if (tokenValue === "null" || undefined || null) {
+        token = false;
+      } else {
+        token = tokenValue;
+      }
     }
 
     if (token) {
