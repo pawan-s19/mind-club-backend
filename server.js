@@ -63,7 +63,11 @@ if (isProduction && cluster.isMaster) {
   //     origin: true, // Allow all origins
   // }));
 
-  app.use(cors());
+  app.use(
+    cors({
+      origin: ["http://localhost:5173", "http://localhost:5174"], // or use an array of allowed origins
+    })
+  );
 
   app.use(express.json({ limit: "50mb" })); // Increased limit for base64 images
   app.use(express.urlencoded({ extended: true, limit: "50mb" }));

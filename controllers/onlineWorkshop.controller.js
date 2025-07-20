@@ -286,6 +286,8 @@ exports.getOnlineWorkshop = async (req, res) => {
     if (!isEnrolled) {
       workshop.meetingID = undefined; // Hide meeting id if not enrolled
       workshop.meetingPassword = undefined; // Hide meeting password if not enrolled
+    } else {
+      workshop.isEnrolled = isEnrolled;
     }
 
     res.status(200).json({ success: true, data: workshop });

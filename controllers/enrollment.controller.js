@@ -76,8 +76,10 @@ exports.order = async (req, res) => {
       key_secret: "4KpQWsH0BQlczdwRXCgpw8xl",
     });
 
+    const gstAddedToTotal = newTotal * 1.18;
+
     const options = {
-      amount: Math.round(newTotal * 100),
+      amount: Math.round(gstAddedToTotal * 100),
       currency: "INR",
       receipt: "receipt_order_" + Date.now(),
       notes: { cart: JSON.stringify(payableWorkshops), userId },
