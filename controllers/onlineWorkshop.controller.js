@@ -1,6 +1,7 @@
 const OnlineWorkshop = require("../models/onlineWorkshop.model");
 const mediaController = require("./media.controller");
 const sharp = require("sharp");
+const jwt = require("jsonwebtoken");
 
 const compressBase64Image = async (base64Image) => {
   try {
