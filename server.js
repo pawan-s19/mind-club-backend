@@ -98,6 +98,7 @@ if (isProduction && cluster.isMaster) {
     app.use('/api/online-workshops', require('./routes/onlineWorkshop.routes'));
     app.use('/api/users', require('./routes/user.routes'));
     app.use('/api/enrollment', require('./routes/enrollment.routes'));
+    app.use("/api/zoom", require('./routes/zoom.routes'));
 
 
     app.post("/payment/orders", require('./controllers/enrollment.controller').order);

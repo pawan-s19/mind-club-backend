@@ -1,19 +1,22 @@
-const OnlineWorkshop = require('../models/onlineWorkshop.model');
-const mediaController = require('./media.controller');
-const sharp = require('sharp');
+const OnlineWorkshop = require("../models/onlineWorkshop.model");
+const mediaController = require("./media.controller");
+const sharp = require("sharp");
 
 const compressBase64Image = async (base64Image) => {
   try {
-    if (typeof base64Image !== 'string' || !base64Image.startsWith('data:image')) {
+    if (
+      typeof base64Image !== "string" ||
+      !base64Image.startsWith("data:image")
+    ) {
       return base64Image;
     }
 
-    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
+    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
 
     const compressedBuffer = await sharp(buffer)
       .resize(1920, 1080, {
-        fit: 'inside',
+        fit: "inside",
         withoutEnlargement: true,
       })
       .jpeg({
@@ -22,29 +25,29 @@ const compressBase64Image = async (base64Image) => {
       })
       .toBuffer();
 
-    return `data:image/jpeg;base64,${compressedBuffer.toString('base64')}`;
+    return `data:image/jpeg;base64,${compressedBuffer.toString("base64")}`;
   } catch (error) {
-    console.error('Image compression failed:', error.message);
-    throw new Error('Image compression failed.');
+    console.error("Image compression failed:", error.message);
+    throw new Error("Image compression failed.");
   }
 };
 
 const uploadBase64Media = async (base64String) => {
   try {
-    if (typeof base64String !== 'string' || !base64String.startsWith('data:')) {
+    if (typeof base64String !== "string" || !base64String.startsWith("data:")) {
       return base64String;
     }
 
     let mediaToUpload = base64String;
 
-    if (base64String.startsWith('data:image')) {
+    if (base64String.startsWith("data:image")) {
       mediaToUpload = await compressBase64Image(base64String);
     }
 
     const result = await mediaController.uploadToImageKit(mediaToUpload);
     return result;
   } catch (error) {
-    console.error('Error uploading media:', error.message);
+    console.error("Error uploading media:", error.message);
     throw error;
   }
 };
@@ -53,7 +56,11 @@ const processOnlineWorkshopImages = async (data) => {
   const processedData = JSON.parse(JSON.stringify(data));
 
   const processField = async (fieldValue) => {
-    if (typeof fieldValue === 'object' && fieldValue !== null && fieldValue.url) {
+    if (
+      typeof fieldValue === "object" &&
+      fieldValue !== null &&
+      fieldValue.url
+    ) {
       const result = await processField(fieldValue.url);
       return {
         ...fieldValue,
@@ -62,7 +69,7 @@ const processOnlineWorkshopImages = async (data) => {
       };
     }
 
-    if (typeof fieldValue === 'string' && fieldValue.startsWith('data:')) {
+    if (typeof fieldValue === "string" && fieldValue.startsWith("data:")) {
       const result = await uploadBase64Media(fieldValue);
       return result;
     }
@@ -72,14 +79,21 @@ const processOnlineWorkshopImages = async (data) => {
 
   // Header
   if (processedData.workshopHeader?.thumbnail) {
-    processedData.workshopHeader.thumbnail = await processField(processedData.workshopHeader.thumbnail);
+    processedData.workshopHeader.thumbnail = await processField(
+      processedData.workshopHeader.thumbnail
+    );
   }
   if (processedData.workshopHeader?.coverImage) {
-    processedData.workshopHeader.coverImage = await processField(processedData.workshopHeader.coverImage);
+    processedData.workshopHeader.coverImage = await processField(
+      processedData.workshopHeader.coverImage
+    );
   }
 
   // Projects
-  if (processedData.projects?.items && Array.isArray(processedData.projects.items)) {
+  if (
+    processedData.projects?.items &&
+    Array.isArray(processedData.projects.items)
+  ) {
     processedData.projects.items = await Promise.all(
       processedData.projects.items.map(async (project) => ({
         ...project,
@@ -89,7 +103,10 @@ const processOnlineWorkshopImages = async (data) => {
   }
 
   // Mentors
-  if (processedData.aboutMentors?.mentors && Array.isArray(processedData.aboutMentors.mentors)) {
+  if (
+    processedData.aboutMentors?.mentors &&
+    Array.isArray(processedData.aboutMentors.mentors)
+  ) {
     processedData.aboutMentors.mentors = await Promise.all(
       processedData.aboutMentors.mentors.map(async (mentor) => ({
         ...mentor,
@@ -105,7 +122,15 @@ exports.createOnlineWorkshop = async (req, res) => {
   try {
     const rawData = req.body;
 
-    const { workshopHeader, price, workshopHighlights, meetingLink } = rawData;
+    const {
+      workshopHeader,
+      price,
+      workshopHighlights,
+      meetingLink,
+      meetingPassword,
+    } = rawData;
+
+    console.log(meetingLink, meetingPassword);
 
     if (
       !workshopHeader?.title ||
@@ -113,11 +138,12 @@ exports.createOnlineWorkshop = async (req, res) => {
       !workshopHeader?.endDate ||
       !workshopHighlights?.duration ||
       !price?.amount ||
-      !meetingLink
+      !meetingLink ||
+      !meetingPassword
     ) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields',
+        message: "Missing required fields",
       });
     }
 
@@ -126,12 +152,16 @@ exports.createOnlineWorkshop = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Online Workshop created successfully',
+      message: "Online Workshop created successfully",
       data: workshop,
     });
   } catch (error) {
-    console.error('Create Error:', error);
-    res.status(500).json({ success: false, message: 'Creation failed', error: error.message });
+    console.error("Create Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Creation failed",
+      error: error.message,
+    });
   }
 };
 
@@ -142,14 +172,17 @@ exports.updateOnlineWorkshop = async (req, res) => {
 
     const existingWorkshop = await OnlineWorkshop.findById(workshopId);
     if (!existingWorkshop) {
-      return res.status(404).json({ success: false, message: 'Workshop not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Workshop not found" });
     }
 
     // Collect old fileIds
     const oldFileIds = [];
     const collectFileIds = (obj) => {
       if (obj && obj.fileId) oldFileIds.push(obj.fileId);
-      if (obj && typeof obj === 'object') Object.values(obj).forEach(collectFileIds);
+      if (obj && typeof obj === "object")
+        Object.values(obj).forEach(collectFileIds);
     };
     collectFileIds(existingWorkshop.toJSON());
 
@@ -165,37 +198,48 @@ exports.updateOnlineWorkshop = async (req, res) => {
     const newFileIds = new Set();
     const collectNewFileIds = (obj) => {
       if (obj && obj.fileId) newFileIds.add(obj.fileId);
-      if (obj && typeof obj === 'object') Object.values(obj).forEach(collectNewFileIds);
+      if (obj && typeof obj === "object")
+        Object.values(obj).forEach(collectNewFileIds);
     };
     collectNewFileIds(updatedWorkshop.toJSON());
 
     const fileIdsToDelete = oldFileIds.filter((id) => !newFileIds.has(id));
     await Promise.all(
       fileIdsToDelete.map((id) =>
-        mediaController.deleteFromImageKit(id).catch((err) =>
-          console.warn(`Failed to delete fileId ${id}:`, err.message)
-        ) 
+        mediaController
+          .deleteFromImageKit(id)
+          .catch((err) =>
+            console.warn(`Failed to delete fileId ${id}:`, err.message)
+          )
       )
     );
 
     res.status(200).json({
       success: true,
-      message: 'Workshop updated successfully',
+      message: "Workshop updated successfully",
       data: updatedWorkshop,
     });
   } catch (error) {
-    console.error('Update Error:', error);
-    res.status(500).json({ success: false, message: 'Update failed', error: error.message });
+    console.error("Update Error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Update failed", error: error.message });
   }
 };
 
 exports.getAllOnlineWorkshops = async (req, res) => {
   try {
-    const workshops = await OnlineWorkshop.find().sort({ createdAt: -1 }).lean();
-    res.status(200).json({ success: true, count: workshops.length, data: workshops });
+    const workshops = await OnlineWorkshop.find()
+      .sort({ createdAt: -1 })
+      .lean();
+    res
+      .status(200)
+      .json({ success: true, count: workshops.length, data: workshops });
   } catch (error) {
-    console.error('Fetch All Error:', error);
-    res.status(500).json({ success: false, message: 'Fetch failed', error: error.message });
+    console.error("Fetch All Error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Fetch failed", error: error.message });
   }
 };
 
@@ -203,26 +247,31 @@ exports.getOnlineWorkshop = async (req, res) => {
   try {
     const workshop = await OnlineWorkshop.findById(req.params.id).lean();
     if (!workshop) {
-      return res.status(404).json({ success: false, message: 'Workshop not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Workshop not found" });
     }
 
     let isEnrolled = false;
     if (req.user && req.user.id) {
-      const Enrollment = require('../models/Enrollment.model');
+      const Enrollment = require("../models/Enrollment.model");
       isEnrolled = await Enrollment.exists({
         user: req.user.id,
-        workshop: req.params.id
+        workshop: req.params.id,
       });
     }
 
     if (!isEnrolled) {
-      workshop.meetingLink = undefined; // Hide meeting link if not enrolled
+      workshop.meetingID = undefined; // Hide meeting id if not enrolled
+      workshop.meetingPassword = undefined; // Hide meeting password if not enrolled
     }
 
     res.status(200).json({ success: true, data: workshop });
   } catch (error) {
-    console.error('Fetch Error:', error);
-    res.status(500).json({ success: false, message: 'Fetch failed', error: error.message });
+    console.error("Fetch Error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Fetch failed", error: error.message });
   }
 };
 
@@ -230,30 +279,39 @@ exports.deleteOnlineWorkshop = async (req, res) => {
   try {
     const workshop = await OnlineWorkshop.findById(req.params.id);
     if (!workshop) {
-      return res.status(404).json({ success: false, message: 'Workshop not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Workshop not found" });
     }
 
     const fileIdsToDelete = [];
     const collectFileIds = (obj) => {
       if (obj && obj.fileId) fileIdsToDelete.push(obj.fileId);
-      if (obj && typeof obj === 'object') Object.values(obj).forEach(collectFileIds);
+      if (obj && typeof obj === "object")
+        Object.values(obj).forEach(collectFileIds);
     };
     collectFileIds(workshop.toJSON());
 
     await Promise.all(
       fileIdsToDelete.map((fileId) =>
-        mediaController.deleteFromImageKit(fileId).catch((err) =>
-          console.warn(`Failed to delete fileId ${fileId}:`, err.message)
-        )
+        mediaController
+          .deleteFromImageKit(fileId)
+          .catch((err) =>
+            console.warn(`Failed to delete fileId ${fileId}:`, err.message)
+          )
       )
     );
 
     await workshop.deleteOne();
-    res.status(200).json({ success: true, message: 'Workshop deleted successfully' });
+    res
+      .status(200)
+      .json({ success: true, message: "Workshop deleted successfully" });
   } catch (error) {
-    console.error('Delete Error:', error);
-    res.status(500).json({ success: false, message: 'Deletion failed', error: error.message });
+    console.error("Delete Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Deletion failed",
+      error: error.message,
+    });
   }
 };
-
-

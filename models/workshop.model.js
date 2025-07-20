@@ -29,7 +29,7 @@ const workshopSchema = new mongoose.Schema({
     },
     workshopType: {
         type: String,
-        enum: ['online', 'on field'],
+        enum: ['offline', 'on field'],
         required: true
     },
     category: {
