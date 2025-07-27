@@ -1,6 +1,53 @@
 const User = require('../models/user.model');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
+const mediaController = require("./media.controller");
+const sharp = require("sharp");
+
+const compressBase64Image = async (base64Image) => {
+    try {
+        if (
+            typeof base64Image !== "string" ||
+            !base64Image.startsWith("data:image")
+        ) {
+            return base64Image;
+        }
+
+        const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
+        const buffer = Buffer.from(base64Data, "base64");
+
+        const compressedBuffer = await sharp(buffer)
+            .resize(512, 512, {
+                fit: "cover",
+            })
+            .jpeg({ quality: 80, progressive: true })
+            .toBuffer();
+
+        return `data:image/jpeg;base64,${compressedBuffer.toString("base64")}`;
+    } catch (error) {
+        console.error("Image compression failed:", error.message);
+        throw new Error("Image compression failed.");
+    }
+};
+
+const uploadBase64Media = async (base64String) => {
+    try {
+        if (typeof base64String !== "string" || !base64String.startsWith("data:")) {
+            return base64String;
+        }
+
+        let mediaToUpload = base64String;
+
+        if (base64String.startsWith("data:image")) {
+            mediaToUpload = await compressBase64Image(base64String);
+        }
+
+        const result = await mediaController.uploadToImageKit(mediaToUpload);
+        return result;
+    } catch (error) {
+        console.error("Error uploading media:", error.message);
+        throw error;
+    }
+};
 
 const generateToken = (userId) => {
     return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
@@ -70,5 +117,77 @@ exports.signin = async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+exports.updateUserProfile = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id).select("-password");;
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        const { name, phone, bio, gender, dob, avatar } = req.body;
+
+        if (name) user.name = name;
+        if (phone) user.phone = phone;
+        if (bio) user.bio = bio;
+        if (gender) user.gender = gender;
+        if (dob) user.dob = dob;
+
+        if (avatar && typeof avatar === "string" && avatar.startsWith("data:")) {
+            if (user.avatar?.fileId) {
+                await mediaController
+                    .deleteFromImageKit(user.avatar.fileId)
+                    .catch((err) =>
+                        console.warn(`Failed to delete old avatar:`, err.message)
+                    );
+            }
+
+            const uploaded = await uploadBase64Media(avatar);
+            user.avatar = {
+                url: uploaded.url,
+                fileId: uploaded.fileId,
+            };
+        }
+
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Profile updated successfully",
+            user,
+        });
+
+    } catch (error) {
+        console.error("Profile update error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Something went wrong",
+            error: error.message,
+        });
+    }
+};
+
+exports.getUserProfile = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id).select("-password");
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            user
+        });
+    } catch (error) {
+        console.error("Get profile error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Something went wrong",
+            error: error.message
+        });
     }
 };
